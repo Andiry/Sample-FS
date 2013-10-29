@@ -37,19 +37,11 @@ static int samplefs_fill_super(struct super_block * sb, void * data, int silent)
 	return 0;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)
-struct super_block * samplefs_get_sb(struct file_system_type *fs_type,
+static struct dentry *samplefs_mount(struct file_system_type *fs_type,
         int flags, const char *dev_name, void *data)
 {
 	return mount_nodev(fs_type, flags, data, samplefs_fill_super);
 }
-#else
-static struct dentry *samplefs_mount(struct file_system_type *fs_type,
-        int flags, const char *dev_name, void *data, struct vfsmount *mnt)
-{
-	return mount_nodev(fs_type, flags, data, samplefs_fill_super);
-}
-#endif
 
 
 static struct file_system_type samplefs_fs_type = {
