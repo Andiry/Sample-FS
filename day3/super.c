@@ -26,6 +26,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/pagemap.h>
 #include <linux/version.h>
@@ -128,7 +129,7 @@ static int samplefs_fill_super(struct super_block *sb, void * data, int silent)
 /* Eventually replace iget with:
 	inode = samplefs_get_inode(sb, S_IFDIR | 0755, 0); */
 
-	inode = iget(sb, SAMPLEFS_ROOT_I);
+	inode = iget_locked(sb, SAMPLEFS_ROOT_I);
 
 	if (!inode)
 		return -ENOMEM;
@@ -146,7 +147,7 @@ static int samplefs_fill_super(struct super_block *sb, void * data, int silent)
 
 	printk(KERN_INFO "samplefs: about to alloc root inode\n");
 
-	sb->s_root = d_alloc_root(inode);
+	sb->s_root = d_make_root(inode);
 	if (!sb->s_root) {
 		iput(inode);
 		kfree(sfs_sb);
@@ -163,25 +164,16 @@ static int samplefs_fill_super(struct super_block *sb, void * data, int silent)
 	return 0;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)
-struct super_block * samplefs_get_sb(struct file_system_type *fs_type,
+struct dentry *samplefs_mount(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data)
 {
-	return get_sb_nodev(fs_type, flags, data, samplefs_fill_super);
+	return mount_nodev(fs_type, flags, data, samplefs_fill_super);
 }
-#else
-int samplefs_get_sb(struct file_system_type *fs_type,
-	int flags, const char *dev_name, void *data, struct vfsmount *mnt)
-{
-	return get_sb_nodev(fs_type, flags, data, samplefs_fill_super, mnt);
-}
-#endif
-
 
 static struct file_system_type samplefs_fs_type = {
 	.owner = THIS_MODULE,
 	.name = "samplefs",
-	.get_sb = samplefs_get_sb,
+	.mount = samplefs_mount,
 	.kill_sb = kill_anon_super,
 	/*  .fs_flags */
 };
@@ -221,16 +213,22 @@ sfs_debug_read(char *buf, char **beginBuffer, off_t offset,
 
 	return length;
 }
+
+static const struct file_operations samplefs_debug_fops = {
+	.owner = THIS_MODULE,
+	.read = sfs_debug_read,
+};
+
 void
 sfs_proc_init(void)
 {
-	proc_fs_samplefs = proc_mkdir("samplefs", proc_root_fs);
+	proc_fs_samplefs = proc_mkdir("fs/samplefs", NULL);
 	if (proc_fs_samplefs == NULL)
 		return;
 
-	proc_fs_samplefs->owner = THIS_MODULE;
-	create_proc_read_entry("DebugData", 0, proc_fs_samplefs,
-				sfs_debug_read, NULL);
+//	proc_fs_samplefs->owner = THIS_MODULE;
+	proc_create_data("DebugData", 0, proc_fs_samplefs,
+				&samplefs_debug_fops, NULL);
 }
 
 void
@@ -240,7 +238,7 @@ sfs_proc_clean(void)
 		return;
 
 	remove_proc_entry("DebugData", proc_fs_samplefs);
-	remove_proc_entry("samplefs", proc_root_fs);
+	remove_proc_entry("fs/samplefs", NULL);
 }
 #endif /* CONFIG_PROC_FS */
 

@@ -1,2 +1,2 @@
-/home/stevef/s-fs-scratch/day3/samplefs.ko
-/home/stevef/s-fs-scratch/day3/super.o
+/home/brienza/test/sample_fs/samplefs/day3/samplefs.ko
+/home/brienza/test/sample_fs/samplefs/day3/super.o
