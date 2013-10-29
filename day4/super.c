@@ -26,7 +26,10 @@
  */
 
 #include <linux/module.h>
+#include <linux/slab.h>
 #include <linux/fs.h>
+#include <linux/sched.h>
+#include <linux/cred.h>
 #include <linux/pagemap.h>
 #include <linux/version.h>
 #include <linux/nls.h>
@@ -116,8 +119,8 @@ struct inode *samplefs_get_inode(struct super_block *sb, int mode, dev_t dev)
 
         if (inode) {
                 inode->i_mode = mode;
-                inode->i_uid = current->fsuid;
-                inode->i_gid = current->fsgid;
+                inode->i_uid = current_fsuid();
+                inode->i_gid = current_fsgid();
                 inode->i_blocks = 0;
                 inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
                 switch (mode & S_IFMT) {
@@ -132,7 +135,7 @@ struct inode *samplefs_get_inode(struct super_block *sb, int mode, dev_t dev)
                         inode->i_op = &simple_dir_inode_operations;
 
                         /* link == 2 (for initial ".." and "." entries) */
-                        inode->i_nlink++;
+                        inc_nlink(inode);
                         break;
                 }
         }
@@ -175,7 +178,7 @@ static int samplefs_fill_super(struct super_block * sb, void * data, int silent)
 
 	printk(KERN_INFO "samplefs: about to alloc root inode\n");
 
-	sb->s_root = d_alloc_root(inode);
+	sb->s_root = d_make_root(inode);
 	if (!sb->s_root) {
 		iput(inode);
 		kfree(sfs_sb);
@@ -192,30 +195,23 @@ static int samplefs_fill_super(struct super_block * sb, void * data, int silent)
 	return 0;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)
-struct super_block * samplefs_get_sb(struct file_system_type *fs_type,
+static struct dentry* samplefs_get_sb(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data)
 {
-	return get_sb_nodev(fs_type, flags, data, samplefs_fill_super);
+	return mount_nodev(fs_type, flags, data, samplefs_fill_super);
 }
-#else
-int samplefs_get_sb(struct file_system_type *fs_type,
-	int flags, const char *dev_name, void *data, struct vfsmount *mnt)
-{
-	return get_sb_nodev(fs_type, flags, data, samplefs_fill_super, mnt);
-}
-#endif
 
 
 static struct file_system_type samplefs_fs_type = {
 	.owner = THIS_MODULE,
 	.name = "samplefs",
-	.get_sb = samplefs_get_sb,
+	.mount = samplefs_get_sb,
 	.kill_sb = kill_anon_super,
 	/*  .fs_flags */
 };
 
-#ifdef CONFIG_PROC_FS
+//#ifdef CONFIG_PROC_FS
+#if 0
 static struct proc_dir_entry *proc_fs_samplefs;
 
 static int
@@ -277,7 +273,7 @@ static int __init init_samplefs_fs(void)
 {
 	printk(KERN_INFO "init samplefs\n");
 #ifdef CONFIG_PROC_FS
-	sfs_proc_init();
+//	sfs_proc_init();
 #endif
 
 	/* some filesystems pass optional parms at load time */
@@ -294,7 +290,7 @@ static void __exit exit_samplefs_fs(void)
 {
 	printk(KERN_INFO "unloading samplefs\n");
 #ifdef CONFIG_PROC_FS
-	sfs_proc_clean();
+//	sfs_proc_clean();
 #endif
 	unregister_filesystem(&samplefs_fs_type);
 }
