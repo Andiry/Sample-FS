@@ -26,6 +26,9 @@
  */
 
 #include <linux/module.h>
+#include <linux/slab.h>
+#include <linux/sched.h>
+#include <linux/cred.h>
 #include <linux/fs.h>
 #include <linux/pagemap.h>
 #include <linux/version.h>
@@ -120,7 +123,7 @@ samplefs_parse_mount_options(char *options, struct samplefs_sb_info *sfs_sb)
 	}
 }
 
-static int sfs_ci_hash(struct dentry *dentry, struct qstr *q)
+static int sfs_ci_hash(const struct dentry *dentry, struct qstr *q)
 {
         struct nls_table *codepage = SFS_SB(dentry->d_inode->i_sb)->local_nls;
         unsigned long hash;
@@ -157,7 +160,7 @@ static int sfs_ci_compare(struct dentry *dentry, struct qstr *a,
 in memory - we are not saving anything as we would for network
 or disk filesystem */
 
-static int sfs_delete_dentry(struct dentry *dentry)
+static int sfs_delete_dentry(const struct dentry *dentry)
 {
         return 1;
 }
@@ -169,7 +172,7 @@ struct dentry_operations sfs_dentry_ops = {
 struct dentry_operations sfs_ci_dentry_ops = {
 /*	.d_revalidate = xxxd_revalidate, Not needed for this type of fs */
 	.d_hash = sfs_ci_hash,
-	.d_compare = sfs_ci_compare,
+//	.d_compare = sfs_ci_compare,
 	.d_delete = sfs_delete_dentry,
 };
 
@@ -195,8 +198,8 @@ struct inode *samplefs_get_inode(struct super_block *sb, int mode, dev_t dev)
 
         if (inode) {
                 inode->i_mode = mode;
-                inode->i_uid = current->fsuid;
-                inode->i_gid = current->fsgid;
+                inode->i_uid = current_fsuid();
+                inode->i_gid = current_fsgid();
                 inode->i_blocks = 0;
                 inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 		printk(KERN_INFO "about to set inode ops\n");
@@ -217,7 +220,7 @@ struct inode *samplefs_get_inode(struct super_block *sb, int mode, dev_t dev)
 			inode->i_fop = &simple_dir_operations;
 
                         /* link == 2 (for initial ".." and "." entries) */
-                        inode->i_nlink++;
+                        inc_nlink(inode);
                         break;
                 }
         }
@@ -257,7 +260,7 @@ static int samplefs_fill_super(struct super_block * sb, void * data, int silent)
 	
 	printk(KERN_INFO "samplefs: about to alloc root inode\n");
 
-	sb->s_root = d_alloc_root(inode);
+	sb->s_root = d_make_root(inode);
 	if (!sb->s_root) {
 		iput(inode);
 		kfree(sfs_sb);
@@ -274,30 +277,22 @@ static int samplefs_fill_super(struct super_block * sb, void * data, int silent)
 	return 0;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)
-struct super_block * samplefs_get_sb(struct file_system_type *fs_type,
+struct dentry * samplefs_get_sb(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data)
 {
-	return get_sb_nodev(fs_type, flags, data, samplefs_fill_super);
+	return mount_nodev(fs_type, flags, data, samplefs_fill_super);
 }
-#else
-int samplefs_get_sb(struct file_system_type *fs_type,
-	int flags, const char *dev_name, void *data, struct vfsmount *mnt)
-{
-	return get_sb_nodev(fs_type, flags, data, samplefs_fill_super, mnt);
-}
-#endif
-
 
 static struct file_system_type samplefs_fs_type = {
 	.owner = THIS_MODULE,
 	.name = "samplefs",
-	.get_sb = samplefs_get_sb,
+	.mount = samplefs_get_sb,
 	.kill_sb = kill_litter_super,
 	/*  .fs_flags */
 };
 
-#ifdef CONFIG_PROC_FS
+//#ifdef CONFIG_PROC_FS
+#if 0
 static struct proc_dir_entry *proc_fs_samplefs;
 
 static int
@@ -359,7 +354,7 @@ static int __init init_samplefs_fs(void)
 {
 	printk(KERN_INFO "init samplefs\n");
 #ifdef CONFIG_PROC_FS
-	sfs_proc_init();
+//	sfs_proc_init();
 #endif
 
 	/* some filesystems pass optional parms at load time */
@@ -376,7 +371,7 @@ static void __exit exit_samplefs_fs(void)
 {
 	printk(KERN_INFO "unloading samplefs\n");
 #ifdef CONFIG_PROC_FS
-	sfs_proc_clean();
+//	sfs_proc_clean();
 #endif
 	unregister_filesystem(&samplefs_fs_type);
 }
