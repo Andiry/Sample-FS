@@ -28,6 +28,19 @@
 #include <linux/module.h>
 #include <linux/fs.h>
 
+long test_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+	printk("enter %s\n", __func__);
+	switch (cmd) {
+	case FS_IOC_GETFLAGS:
+		printk("ioctl: FS_IOC_GETFLAGS %d\n", *(int *)arg);
+		break;
+	default:
+		break;
+	}
+	return 0;
+}	
+
 struct address_space_operations sfs_aops = {
 	.readpage       = simple_readpage,
 	.write_begin	= simple_write_begin,
@@ -42,5 +55,6 @@ struct file_operations sfs_file_operations = {
 	.mmap           = generic_file_mmap,
 	.fsync          = noop_fsync,
 	.llseek         = generic_file_llseek,
+	.unlocked_ioctl	= test_ioctl,
 };
 

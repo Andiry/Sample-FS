@@ -43,6 +43,7 @@ static struct dentry *sfs_lookup(struct inode *dir, struct dentry *dentry,
 				unsigned int nd)
 {
 	struct samplefs_sb_info * sfs_sb = SFS_SB(dir->i_sb);
+	printk(KERN_INFO "samplefs: lookup\n");
 	if (dentry->d_name.len > NAME_MAX)
 		return ERR_PTR(-ENAMETOOLONG);
 	if(sfs_sb->flags & SFS_MNT_CASE)
@@ -83,6 +84,7 @@ static int sfs_mkdir(struct inode * dir, struct dentry * dentry, umode_t mode)
 {
         int retval = 0;
 	
+	printk(KERN_INFO "samplefs: %s\n", __func__);
 	retval = sfs_mknod(dir, dentry, mode | S_IFDIR, 0);
 
 	/* link count is two for dir, for dot and dot dot */
@@ -94,6 +96,7 @@ static int sfs_mkdir(struct inode * dir, struct dentry * dentry, umode_t mode)
 static int sfs_create(struct inode *dir, struct dentry *dentry, umode_t mode, 
 			bool nd)
 {
+	printk(KERN_INFO "samplefs: %s\n", __func__);
         return sfs_mknod(dir, dentry, mode | S_IFREG, 0);
 }
 
@@ -103,6 +106,7 @@ static int sfs_symlink(struct inode * dir, struct dentry *dentry,
 	struct inode *inode;
 	int error = -ENOSPC;
 
+	printk(KERN_INFO "samplefs: %s\n", __func__);
 	inode = samplefs_get_inode(dir->i_sb, S_IFLNK|S_IRWXUGO, 0);
 	if (inode) {
 		int l = strlen(symname)+1;
